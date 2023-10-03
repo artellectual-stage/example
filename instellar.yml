@@ -1,0 +1,57 @@
+dependencies:
+  build:
+    - ruby
+    - ruby-bundler
+    - ruby-dev
+    - ruby-tzinfo
+    - libpq-dev
+  runtime:
+    - bash
+    - curl
+    - jq
+    - ca-certificates
+    - s6
+    - ruby
+    - ruby-bundler
+    - ruby-tzinfo
+    - ruby-rdoc
+    - libpq
+
+stack: alpine/3.18
+
+build:
+  command: |
+    bundle config set deployment 'true'
+    bundle config set without 'development test'
+    
+    bundle install
+    
+    bundle exec rails assets:precompile
+  destinations:
+    - '*'
+    - .bundle
+
+run:
+  commands:
+    - binary: rails
+      call: db:migrate
+      name: migrate
+  name: example
+  services:
+    - binary: rails
+      name: web
+      start:
+        call: server
+
+hook:
+  post-deinstall: |
+    rc-service example stop
+    rc-update del example
+  post-install: |
+    rc-update add example
+    rc-service example migrate
+  post-upgrade: |
+    rc-service example migrate
+    rc-service example start
+  pre-upgrade: |
+    rc-service example stop
